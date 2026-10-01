@@ -102,3 +102,7 @@ Executar uma classe ou um teste específico:
 ./mvnw test -Dtest=ProducerAwardIntervalsIntegrationTest
 ./mvnw test -Dtest='MovieIntegrationTest#filtersWinnersByYear'
 ```
+
+## Uso de IA
+
+O desenvolvimento foi feito com apoio do Claude Code, seguindo Spec-Driven Development. A especificação, as decisões, o plano e o log das interações estão em [`docs/ai`](docs/ai/README.md).
