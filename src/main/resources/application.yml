@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: golden-raspberry-awards
+  datasource:
+    generate-unique-name: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+        jdbc:
+          batch_size: 100
+        order_inserts: true
+  mvc:
+    problemdetails:
+      enabled: true
+
+app:
+  movies:
+    csv-path: classpath:movielist.csv
