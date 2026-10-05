@@ -134,6 +134,50 @@ class ProducerAwardIntervalsIntegrationTest {
     }
 
     @Nested
+    @TestPropertySource(properties = "app.movies.csv-path=classpath:datasets/producer-name-case.csv")
+    class WhenNamesAndSeparatorsVaryInCase {
+
+        @Autowired
+        private MockMvc mockMvc;
+
+        @Test
+        void treatsTheProducerAsTheSameKeepingTheFirstSpelling() throws Exception {
+            assertAwardIntervals(mockMvc, """
+                    {
+                      "min": [
+                        { "producer": "Joel Silver", "interval": 1, "previousWin": 1990, "followingWin": 1991 }
+                      ],
+                      "max": [
+                        { "producer": "Anna Bell", "interval": 8, "previousWin": 1991, "followingWin": 1999 }
+                      ]
+                    }
+                    """);
+        }
+    }
+
+    @Nested
+    @TestPropertySource(properties = "app.movies.csv-path=classpath:datasets/byte-order-mark.csv")
+    class WhenTheFileStartsWithAByteOrderMark {
+
+        @Autowired
+        private MockMvc mockMvc;
+
+        @Test
+        void readsTheHeaderAndCalculatesTheIntervals() throws Exception {
+            assertAwardIntervals(mockMvc, """
+                    {
+                      "min": [
+                        { "producer": "Producer B", "interval": 1, "previousWin": 2000, "followingWin": 2001 }
+                      ],
+                      "max": [
+                        { "producer": "Producer C", "interval": 7, "previousWin": 2003, "followingWin": 2010 }
+                      ]
+                    }
+                    """);
+        }
+    }
+
+    @Nested
     @TestPropertySource(properties = "app.movies.csv-path=classpath:datasets/single-interval.csv")
     class WhenThereIsASingleInterval {
 

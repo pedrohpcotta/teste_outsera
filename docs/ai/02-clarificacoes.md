@@ -23,6 +23,9 @@ Pontos ambíguos ou não cobertos pela especificação, levantados pela IA duran
 | Apenas um intervalo no conjunto | O mesmo item aparece em `min` e em `max` |
 | `winner` com variação de caixa ou espaços (`YES`, ` yes `) | Considerado vencedor |
 | Indicações não vencedoras | Ignoradas no cálculo |
+| Separador ` and ` em maiúsculas ou misto (` AND `, ` And `) | Também separa produtores |
+| Mesmo nome com caixa diferente (`Joel Silver` e `joel silver`) | Mesmo produtor ou estúdio; prevalece a primeira grafia do arquivo |
 | Nomes contendo "and" (ex.: `Anderson`) | Não são divididos: o separador exige espaço antes e depois |
 | Estúdios | Separados apenas por vírgula, para não quebrar nomes com "and" |
-| CSV inválido (cabeçalho ausente, ano não numérico, título vazio, colunas inconsistentes) | A aplicação não inicia e informa a linha com problema |
+| Arquivo UTF-8 com BOM (salvo pelo Excel ou no Windows) | Aceito: o BOM é descartado antes da leitura do cabeçalho |
+| CSV inválido (arquivo inexistente, cabeçalho ausente, ano não numérico, título vazio, colunas inconsistentes, aspas não fechadas) | A aplicação não inicia e informa o problema e a linha correspondente |

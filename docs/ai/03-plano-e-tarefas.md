@@ -18,13 +18,17 @@ Organização por feature:
 
 ## Modelo de dados
 
-`Movie` se relaciona com `Producer` e `Studio` via `@ManyToMany`, de forma normalizada. Produtores e estúdios são deduplicados por nome durante a carga.
+`Movie` se relaciona com `Producer` e `Studio` via `@ManyToMany`, de forma normalizada. Produtores e estúdios são deduplicados por nome, sem diferenciar maiúsculas, durante a carga.
+
+## Carga do CSV
+
+Um BOM UTF-8 no início do arquivo é descartado antes do parser, para que o cabeçalho seja reconhecido. Em seguida, uma única passada sobre o arquivo: cada linha é validada, convertida e persistida no mesmo loop. Produtores e estúdios novos são persistidos na primeira vez em que aparecem e reaproveitados nas linhas seguintes por um mapa em memória. Não há lista intermediária de registros nem de filmes; o Hibernate agrupa os inserts em lotes (`jdbc.batch_size`).
 
 ## Algoritmo dos intervalos
 
 1. Uma query JPQL retorna os pares `(produtor, ano)` apenas dos filmes vencedores, já ordenados por produtor e ano.
-2. Uma única passada sobre a lista gera os intervalos entre vitórias consecutivas do mesmo produtor. Custo O(n) após a ordenação, que é feita pelo banco.
-3. O menor e o maior intervalo são identificados e todos os empates de cada um são retornados.
+2. Uma única passada sobre a lista calcula o intervalo entre vitórias consecutivas do mesmo produtor e, no mesmo loop, mantém o menor e o maior intervalo com todos os empates de cada um. Custo O(n) após a ordenação, que é feita pelo banco.
+3. Como a lista chega ordenada por produtor e ano, os intervalos já são gerados na ordem da resposta (produtor e ano da vitória anterior), sem ordenação adicional.
 
 ## Decisões técnicas
 
@@ -57,4 +61,7 @@ Somente testes de integração (`@SpringBootTest` + MockMvc), com a aplicação 
 | Separadores de produtores e variações de `winner` | `datasets/producer-separators.csv` |
 | Um único intervalo | `datasets/single-interval.csv` |
 | Nenhum intervalo | `datasets/no-intervals.csv` |
+| Variação de maiúsculas no nome e no separador ` and ` | `datasets/producer-name-case.csv` |
+| Arquivo iniciado com BOM UTF-8 | `datasets/byte-order-mark.csv` |
 | Listagem, filtros, 404 e 400 | `movielist.csv` |
+| CSV inválido: arquivo inexistente, cabeçalho ausente, ano inválido, título vazio, colunas inconsistentes, aspas não fechadas (a aplicação não inicia) | `datasets/invalid/*.csv` |

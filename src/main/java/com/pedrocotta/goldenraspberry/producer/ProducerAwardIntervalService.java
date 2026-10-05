@@ -4,15 +4,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 @Service
 public class ProducerAwardIntervalService {
-
-    private static final Comparator<ProducerAwardInterval> TIE_ORDER = Comparator
-            .comparing(ProducerAwardInterval::producer)
-            .thenComparingInt(ProducerAwardInterval::previousWin);
 
     private final ProducerRepository producerRepository;
 
@@ -22,37 +17,43 @@ public class ProducerAwardIntervalService {
 
     @Transactional(readOnly = true)
     public AwardIntervalsResponse findMinAndMaxIntervals() {
-        List<ProducerAwardInterval> intervals = consecutiveIntervals(producerRepository.findAllWinsOrderedByProducerAndYear());
-        if (intervals.isEmpty()) {
-            return AwardIntervalsResponse.empty();
-        }
+        List<ProducerWin> orderedWins = producerRepository.findAllWinsOrderedByProducerAndYear();
 
-        int min = intervals.stream().mapToInt(ProducerAwardInterval::interval).min().orElseThrow();
-        int max = intervals.stream().mapToInt(ProducerAwardInterval::interval).max().orElseThrow();
+        List<ProducerAwardInterval> min = new ArrayList<>();
+        List<ProducerAwardInterval> max = new ArrayList<>();
+        int minInterval = Integer.MAX_VALUE;
+        int maxInterval = Integer.MIN_VALUE;
 
-        return new AwardIntervalsResponse(withInterval(intervals, min), withInterval(intervals, max));
-    }
-
-    private static List<ProducerAwardInterval> consecutiveIntervals(List<ProducerWin> orderedWins) {
-        List<ProducerAwardInterval> intervals = new ArrayList<>();
         for (int i = 1; i < orderedWins.size(); i++) {
             ProducerWin previous = orderedWins.get(i - 1);
             ProducerWin following = orderedWins.get(i);
-            if (previous.producer().equals(following.producer())) {
-                intervals.add(new ProducerAwardInterval(
-                        following.producer(),
-                        following.year() - previous.year(),
-                        previous.year(),
-                        following.year()));
+            if (!previous.producer().equals(following.producer())) {
+                continue;
+            }
+
+            ProducerAwardInterval interval = new ProducerAwardInterval(
+                    following.producer(),
+                    following.year() - previous.year(),
+                    previous.year(),
+                    following.year());
+
+            if (interval.interval() < minInterval) {
+                minInterval = interval.interval();
+                min.clear();
+            }
+            if (interval.interval() == minInterval) {
+                min.add(interval);
+            }
+
+            if (interval.interval() > maxInterval) {
+                maxInterval = interval.interval();
+                max.clear();
+            }
+            if (interval.interval() == maxInterval) {
+                max.add(interval);
             }
         }
-        return intervals;
-    }
 
-    private static List<ProducerAwardInterval> withInterval(List<ProducerAwardInterval> intervals, int interval) {
-        return intervals.stream()
-                .filter(candidate -> candidate.interval() == interval)
-                .sorted(TIE_ORDER)
-                .toList();
+        return new AwardIntervalsResponse(min, max);
     }
 }

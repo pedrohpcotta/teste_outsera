@@ -6,12 +6,15 @@ import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.PushbackReader;
 import java.io.Reader;
-import java.util.ArrayList;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 @Component
@@ -22,10 +25,11 @@ public class MovieCsvReader {
     private static final String STUDIOS = "studios";
     private static final String PRODUCERS = "producers";
     private static final String WINNER = "winner";
-    private static final Set<String> REQUIRED_HEADERS = Set.of(YEAR, TITLE, STUDIOS, PRODUCERS, WINNER);
+    private static final List<String> REQUIRED_HEADERS = List.of(YEAR, TITLE, STUDIOS, PRODUCERS, WINNER);
+    private static final int BYTE_ORDER_MARK = '﻿';
 
     private static final Pattern STUDIO_SEPARATOR = Pattern.compile(",");
-    private static final Pattern PRODUCER_SEPARATOR = Pattern.compile(",|\\s+and\\s+");
+    private static final Pattern PRODUCER_SEPARATOR = Pattern.compile(",|\\s+and\\s+", Pattern.CASE_INSENSITIVE);
 
     private static final CSVFormat FORMAT = CSVFormat.DEFAULT.builder()
             .setDelimiter(';')
@@ -37,24 +41,35 @@ public class MovieCsvReader {
             .setTrim(true)
             .get();
 
-    public List<MovieCsvRecord> read(Reader reader) {
-        try (CSVParser parser = FORMAT.parse(reader)) {
+    public long read(Reader reader, Consumer<MovieCsvRecord> consumer) {
+        try (CSVParser parser = FORMAT.parse(withoutByteOrderMark(reader))) {
             validateHeaders(parser.getHeaderNames());
-            List<MovieCsvRecord> movies = new ArrayList<>();
+            long count = 0;
             for (CSVRecord record : parser) {
-                movies.add(toMovie(record));
+                consumer.accept(toMovie(record));
+                count++;
             }
-            return movies;
-        } catch (IOException | IllegalArgumentException | IllegalStateException e) {
+            return count;
+        } catch (IOException | UncheckedIOException | IllegalArgumentException | IllegalStateException e) {
             throw new MovieCsvParseException("Unable to read movies CSV: " + e.getMessage(), e);
         }
     }
 
+    private static Reader withoutByteOrderMark(Reader reader) throws IOException {
+        PushbackReader pushbackReader = new PushbackReader(reader);
+        int first = pushbackReader.read();
+        if (first != -1 && first != BYTE_ORDER_MARK) {
+            pushbackReader.unread(first);
+        }
+        return pushbackReader;
+    }
+
     private static void validateHeaders(List<String> headers) {
-        Set<String> normalized = new LinkedHashSet<>();
-        headers.forEach(header -> normalized.add(header.toLowerCase()));
-        if (!normalized.containsAll(REQUIRED_HEADERS)) {
-            throw new MovieCsvParseException("Movies CSV must contain the headers " + REQUIRED_HEADERS + " but found " + headers);
+        Set<String> normalized = new HashSet<>();
+        headers.forEach(header -> normalized.add(header.toLowerCase(Locale.ROOT)));
+        List<String> missing = REQUIRED_HEADERS.stream().filter(header -> !normalized.contains(header)).toList();
+        if (!missing.isEmpty()) {
+            throw new MovieCsvParseException("Movies CSV is missing the headers " + missing);
         }
     }
 

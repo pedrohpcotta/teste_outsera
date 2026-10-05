@@ -12,6 +12,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
+import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,8 +23,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 @Component
@@ -55,42 +58,40 @@ public class MovieDataLoader implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        List<MovieCsvRecord> records = readRecords();
-
         Map<String, Producer> producers = new HashMap<>();
         Map<String, Studio> studios = new HashMap<>();
-        List<Movie> movies = records.stream()
-                .map(movie -> new Movie(
-                        movie.year(),
-                        movie.title(),
-                        movie.winner(),
-                        resolve(movie.studios(), studios, Studio::new),
-                        resolve(movie.producers(), producers, Producer::new)))
-                .toList();
 
-        studioRepository.saveAll(studios.values());
-        producerRepository.saveAll(producers.values());
-        movieRepository.saveAll(movies);
+        long movies = readMovies(movie -> movieRepository.save(new Movie(
+                movie.year(),
+                movie.title(),
+                movie.winner(),
+                resolve(movie.studios(), studios, studioRepository, Studio::new),
+                resolve(movie.producers(), producers, producerRepository, Producer::new))));
 
         log.info("Loaded {} movies, {} producers and {} studios from {}",
-                movies.size(), producers.size(), studios.size(), properties.csvPath());
+                movies, producers.size(), studios.size(), properties.csvPath());
     }
 
-    private List<MovieCsvRecord> readRecords() {
+    private long readMovies(Consumer<MovieCsvRecord> consumer) {
         Resource resource = resourceLoader.getResource(properties.csvPath());
         if (!resource.exists()) {
             throw new MovieCsvParseException("Movies CSV not found at " + properties.csvPath());
         }
         try (Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8)) {
-            return csvReader.read(reader);
+            return csvReader.read(reader, consumer);
         } catch (IOException e) {
             throw new MovieCsvParseException("Unable to open movies CSV at " + properties.csvPath(), e);
         }
     }
 
-    private static <T> Set<T> resolve(List<String> names, Map<String, T> cache, Function<String, T> factory) {
+    private static <T> Set<T> resolve(List<String> names,
+                                      Map<String, T> cache,
+                                      CrudRepository<T, Long> repository,
+                                      Function<String, T> factory) {
         Set<T> resolved = new LinkedHashSet<>();
-        names.forEach(name -> resolved.add(cache.computeIfAbsent(name, factory)));
+        names.forEach(name -> resolved.add(cache.computeIfAbsent(
+                name.toLowerCase(Locale.ROOT),
+                key -> repository.save(factory.apply(name)))));
         return resolved;
     }
 }
